@@ -1,0 +1,84 @@
+{
+  "name": "@elizaos/plugin-openchat",
+  "version": "0.1.0",
+  "description": "OpenChat integration plugin for ElizaOS - enables agents to interact with OpenChat platform",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "packageType": "plugin",
+  "platform": "node",
+  "license": "MIT",
+  "author": "OpenChat x ElizaOS",
+  "keywords": [
+    "plugin",
+    "elizaos",
+    "openchat",
+    "web3",
+    "chat",
+    "bot"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "dependencies": {
+    "@elizaos/core": "*",
+    "@open-ic/openchat-botclient-ts": "^1.0.61",
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "uuid": "^11.0.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "OPENCHAT_BOT_IDENTITY_PRIVATE_KEY": {
+        "type": "string",
+        "description": "Private key (PEM format) for bot identity on OpenChat",
+        "required": true
+      },
+      "OPENCHAT_PUBLIC_KEY": {
+        "type": "string",
+        "description": "OpenChat public key for JWT verification",
+        "required": true
+      },
+      "OPENCHAT_IC_HOST": {
+        "type": "string",
+        "description": "Internet Computer host URL (e.g., https://ic0.app)",
+        "required": true
+      },
+      "OPENCHAT_STORAGE_INDEX_CANISTER": {
+        "type": "string",
+        "description": "OpenChat storage index canister ID",
+        "required": true
+      },
+      "OPENCHAT_BOT_PORT": {
+        "type": "string",
+        "description": "Port for OpenChat bot server (default: 3000)",
+        "required": false,
+        "default": "3000"
+      }
+    }
+  }
+}

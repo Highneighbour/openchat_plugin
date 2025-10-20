@@ -1,0 +1,11 @@
+src/
+tsconfig.json
+.env.example
+.gitignore
+*.log
+node_modules/
+.vscode/
+.idea/
+examples/
+*.test.ts
+*.spec.ts
