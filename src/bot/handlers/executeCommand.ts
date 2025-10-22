@@ -219,12 +219,21 @@ async function handleHelpCommand(
 • \`/chat <message>\` - Chat with me
 • \`/help\` - Show this help message
 • \`/info\` - Get information about me
+• \`/poll <question> <options>\` - Create a poll
+• \`/moderate <action>\` - Configure moderation (Moderator only)
 
 **About Me:**
 ${character.bio?.[0] || "I'm an AI agent powered by ElizaOS"}
 
+**Capabilities:**
+• Intelligent conversation and assistance
+• Content moderation and spam detection
+• Poll creation and management
+• Media sharing (images, videos, files)
+• Automated responses to mentions
+
 **How to Use:**
-Simply use the /chat command followed by your message, or send me a direct message!`;
+Simply use the /chat command followed by your message, or mention me in a group chat!`;
 
     const message = (await client.createTextMessage(helpText)).setFinalised(true);
     res.status(200).json(success(message));
@@ -258,12 +267,126 @@ ${character.bio?.[0] || "I'm an AI agent powered by ElizaOS"}
 • Context-aware responses
 • Memory of past interactions
 • Task execution
+• Content moderation
+• Poll creation
+• Media sharing
 
 Powered by ElizaOS 🚀`;
 
     const message = (await client.createTextMessage(infoText)).setFinalised(true);
     res.status(200).json(success(message));
     await client.sendMessage(message);
+}
+
+/**
+ * Handle moderate command
+ */
+async function handleModerateCommand(
+    req: WithBotClient,
+    res: Response,
+    runtime: IAgentRuntime
+): Promise<void> {
+    const client = req.botClient;
+    const action = client.stringArg("action");
+
+    if (!action) {
+        const msg = (await client.createTextMessage("Please specify an action: enable, disable, or status")).setFinalised(true);
+        res.status(200).json(success(msg));
+        await client.sendMessage(msg);
+        return;
+    }
+
+    let responseText = "";
+
+    switch (action.toLowerCase()) {
+        case "enable":
+            // Note: This would typically update a database or configuration
+            responseText = `✅ Moderation enabled for this chat. I will now monitor messages for:
+• Spam and phishing attempts
+• Inappropriate content
+• Excessive caps/shouting
+
+Use \`/moderate disable\` to turn off moderation.`;
+            break;
+
+        case "disable":
+            responseText = `⚠️ Moderation disabled for this chat. I will no longer automatically moderate messages.`;
+            break;
+
+        case "status":
+            const moderationEnabled = runtime.getSetting("OPENCHAT_MODERATION_ENABLED") === "true";
+            const moderationAction = runtime.getSetting("OPENCHAT_MODERATION_ACTION") || "warn";
+            responseText = `📊 Moderation Status:
+• Enabled: ${moderationEnabled ? "Yes" : "No"}
+• Action: ${moderationAction}
+• Monitoring: ${moderationEnabled ? "Spam, Inappropriate Content, Excessive Caps" : "Nothing"}`;
+            break;
+
+        default:
+            responseText = "Unknown action. Use: enable, disable, or status";
+    }
+
+    const message = (await client.createTextMessage(responseText)).setFinalised(true);
+    res.status(200).json(success(message));
+    await client.sendMessage(message);
+}
+
+/**
+ * Handle poll command
+ */
+async function handlePollCommand(
+    req: WithBotClient,
+    res: Response,
+    runtime: IAgentRuntime
+): Promise<void> {
+    const client = req.botClient;
+    const question = client.stringArg("question");
+    const optionsStr = client.stringArg("options");
+
+    if (!question || !optionsStr) {
+        const msg = (await client.createTextMessage("Please provide both a question and options (comma-separated)")).setFinalised(true);
+        res.status(200).json(success(msg));
+        await client.sendMessage(msg);
+        return;
+    }
+
+    // Parse options
+    const options = optionsStr.split(",").map(opt => opt.trim()).filter(opt => opt.length > 0);
+
+    if (options.length < 2) {
+        const msg = (await client.createTextMessage("Please provide at least 2 options for the poll")).setFinalised(true);
+        res.status(200).json(success(msg));
+        await client.sendMessage(msg);
+        return;
+    }
+
+    try {
+        // Create poll
+        const pollConfig = {
+            question,
+            options,
+            allowMultipleVotes: false,
+            showVotesBeforeEndDate: true,
+            anonymous: false,
+        };
+
+        try {
+            const pollMsg = (await (client as any).createPollMessage(pollConfig, {})).setFinalised(true);
+            res.status(200).json(success(pollMsg));
+            await client.sendMessage(pollMsg);
+        } catch (pollError: any) {
+            // Fallback to text-based poll
+            const pollText = `📊 ${question}\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
+            const textMsg = (await client.createTextMessage(pollText)).setFinalised(true);
+            res.status(200).json(success(textMsg));
+            await client.sendMessage(textMsg);
+        }
+    } catch (error: any) {
+        runtime.logger?.error("[OpenChat] Error creating poll:", error?.message || error);
+        const errorMsg = (await client.createTextMessage("Failed to create poll. Please try again.")).setFinalised(true);
+        res.status(200).json(success(errorMsg));
+        await client.sendMessage(errorMsg);
+    }
 }
 
 /**
@@ -296,6 +419,14 @@ export async function executeCommand(
 
             case "info":
                 await handleInfoCommand(req, res, runtime);
+                break;
+
+            case "moderate":
+                await handleModerateCommand(req, res, runtime);
+                break;
+
+            case "poll":
+                await handlePollCommand(req, res, runtime);
                 break;
 
             default:

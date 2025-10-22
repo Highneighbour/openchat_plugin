@@ -2,22 +2,25 @@ import { Request, Response } from "express";
 import { IAgentRuntime, Content, UUID } from "@elizaos/core";
 import { OpenChatClientService } from "../../services/openchatClient.js";
 import { v4 as uuidv4 } from "uuid";
+import { decode } from "@msgpack/msgpack";
 
 /**
  * Parse MessagePack notification payload
- * Note: This is a simplified parser. In production, use a proper MessagePack library
  */
 function parseNotification(buffer: Buffer): any {
     try {
-        // For now, return a basic structure
-        // In production, implement proper MessagePack decoding
-        return {
-            type: "unknown",
-            payload: buffer.toString("base64"),
-        };
+        // Decode MessagePack payload
+        const decoded = decode(buffer);
+        return decoded;
     } catch (error) {
         console.error("Error parsing notification:", error);
-        return null;
+        // Fallback to basic structure if decode fails
+        try {
+            // Try JSON parsing as fallback
+            return JSON.parse(buffer.toString("utf8"));
+        } catch {
+            return null;
+        }
     }
 }
 
@@ -84,22 +87,26 @@ async function handleMessage(
     runtime: IAgentRuntime,
     service: OpenChatClientService
 ): Promise<void> {
-    runtime.logger.debug("[OpenChat] Message event received:", event);
+    runtime.logger.debug("[OpenChat] Message event received");
 
     const scope = event.scope;
-    const message = event.message;
-    const sender = event.sender;
+    const message = event.message || event.data?.message || event;
+    const sender = event.sender || event.data?.sender || message.sender;
+    const messageText = message.text || message.content?.text || "";
 
     // Skip messages from the bot itself
-    if (sender === runtime.agentId) {
+    if (sender === runtime.agentId || sender === "bot") {
         return;
     }
 
     // Check if bot is mentioned or if it's a direct message
-    const isMentioned = message.text?.includes(`@${runtime.character.name}`);
+    const isMentioned = messageText?.includes(`@${runtime.character.name}`);
     const isDirectMessage = scope.kind === "direct";
+    
+    // Check if auto-response is enabled for all messages
+    const autoRespond = runtime.getSetting("OPENCHAT_AUTO_RESPOND_ALL") === "true";
 
-    if (!isMentioned && !isDirectMessage) {
+    if (!isMentioned && !isDirectMessage && !autoRespond) {
         return; // Don't respond to messages that don't mention the bot
     }
 
@@ -118,20 +125,49 @@ async function handleMessage(
             installation.permissions
         );
 
-        // Process message through ElizaOS
-        const roomId = `openchat-${scope.kind}-${scope.chatId}` as UUID;
-        const userId = sender as UUID;
+        // Remove mention from message text for cleaner processing
+        const cleanText = messageText.replace(`@${runtime.character.name}`, "").trim();
 
-        const content: Content = {
-            text: message.text,
-            source: "openchat",
-            inReplyTo: message.replyTo,
-        };
+        // Build a simple prompt for response
+        const character = runtime.character;
+        const prompt = `You are ${character.name}. ${character.bio?.[0] || ""}
 
-        // Generate simple response
-        const responseText = `Thanks for mentioning me! How can I help you?`;
+User: ${cleanText}
+
+${character.name}:`;
+
+        let responseText: string;
+
+        try {
+            // Use basic generateText with string prompt
+            if (typeof (runtime as any).generateText === 'function') {
+                responseText = await (runtime as any).generateText(prompt);
+            } else if (typeof (runtime as any).completion === 'function') {
+                const response = await (runtime as any).completion({
+                    prompt,
+                    stop: ["\n"],
+                });
+                responseText = response.text || response.content || String(response);
+            } else {
+                responseText = "Thanks for mentioning me! How can I help you?";
+            }
+        } catch (genError: any) {
+            runtime.logger?.error("[OpenChat] Text generation error:", genError.message);
+            responseText = "I'm having trouble generating a response. Please try again.";
+        }
+
+        // Ensure we have a string
+        if (typeof responseText !== 'string') {
+            responseText = String(responseText || "I'm here to help!");
+        }
+
+        responseText = responseText.trim();
+
+        // Send response to OpenChat
         const msg = (await client.createTextMessage(responseText)).setFinalised(true);
         await client.sendMessage(msg);
+        
+        runtime.logger?.debug("[OpenChat] ✅ Autonomous response sent");
     } catch (error: any) {
         runtime.logger?.error("[OpenChat] Error handling message:", error?.message || error);
     }
@@ -176,6 +212,63 @@ async function handleMemberJoined(
 }
 
 /**
+ * Handle reaction event
+ */
+async function handleReaction(
+    event: any,
+    runtime: IAgentRuntime,
+    service: OpenChatClientService
+): Promise<void> {
+    runtime.logger.debug("[OpenChat] Reaction event received");
+    
+    // Can be extended to track reactions, respond to specific reactions, etc.
+    const scope = event.scope;
+    const reaction = event.reaction || event.data?.reaction;
+    const messageId = event.messageId || event.data?.messageId;
+    const userId = event.userId || event.data?.userId;
+    
+    runtime.logger.debug(`[OpenChat] User ${userId} reacted with ${reaction} to message ${messageId}`);
+}
+
+/**
+ * Handle member left event
+ */
+async function handleMemberLeft(
+    event: any,
+    runtime: IAgentRuntime,
+    service: OpenChatClientService
+): Promise<void> {
+    runtime.logger.debug("[OpenChat] Member left event received");
+    
+    const scope = event.scope;
+    const member = event.member || event.data?.member;
+    
+    // Optionally send goodbye message
+    const shouldSayGoodbye = runtime.getSetting("OPENCHAT_SAY_GOODBYE") === "true";
+    
+    if (shouldSayGoodbye) {
+        try {
+            const scopeKey = `${scope.kind}-${scope.chatId}`;
+            const installation = service.getInstallations().get(scopeKey);
+            
+            if (installation?.permissions.includes("SendMessages")) {
+                const client = service.createClientForScope(
+                    scope,
+                    scope.apiGateway || runtime.getSetting("OPENCHAT_IC_HOST") || "",
+                    installation.permissions
+                );
+                
+                const goodbyeMsg = `Goodbye ${member.username}! 👋`;
+                const msg = (await client.createTextMessage(goodbyeMsg)).setFinalised(true);
+                await client.sendMessage(msg);
+            }
+        } catch (error: any) {
+            runtime.logger?.error("[OpenChat] Error sending goodbye message:", error?.message || error);
+        }
+    }
+}
+
+/**
  * Main notification handler
  */
 export async function notifyHandler(
@@ -195,26 +288,55 @@ export async function notifyHandler(
             return;
         }
 
+        // Determine event type - try multiple possible field names
+        const eventType = notification.type 
+            || notification.eventType 
+            || notification.event_type
+            || (notification.data?.type)
+            || "unknown";
+
+        runtime.logger.debug(`[OpenChat] Event type: ${eventType}`);
+
         // Handle different event types
-        switch (notification.type) {
+        switch (eventType) {
             case "bot_installed":
+            case "BotInstalled":
+            case "installed":
                 await handleInstallation(notification, runtime, service);
                 break;
 
             case "bot_uninstalled":
+            case "BotUninstalled":
+            case "uninstalled":
                 await handleUninstallation(notification, runtime, service);
                 break;
 
             case "message":
+            case "Message":
+            case "MessageSent":
                 await handleMessage(notification, runtime, service);
                 break;
 
             case "member_joined":
+            case "MemberJoined":
+            case "MembersJoined":
                 await handleMemberJoined(notification, runtime, service);
                 break;
 
+            case "member_left":
+            case "MemberLeft":
+            case "MembersLeft":
+                await handleMemberLeft(notification, runtime, service);
+                break;
+
+            case "reaction":
+            case "Reaction":
+            case "ReactionAdded":
+                await handleReaction(notification, runtime, service);
+                break;
+
             default:
-                runtime.logger.debug(`[OpenChat] Unhandled event type: ${notification.type}`);
+                runtime.logger.debug(`[OpenChat] Unhandled event type: ${eventType}`);
         }
 
         res.status(200).send("OK");

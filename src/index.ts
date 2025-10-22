@@ -3,6 +3,7 @@ import { OpenChatClientService } from "./services/openchatClient.js";
 import { OpenChatBotConfig } from "./types/index.js";
 import { actions } from "./actions/index.js";
 import { providers } from "./providers/index.js";
+import { evaluators } from "./evaluators/index.js";
 
 /**
  * OpenChat Plugin for ElizaOS
@@ -37,7 +38,7 @@ export const openchatPlugin: Plugin = {
     
     actions,
     providers,
-    evaluators: [],
+    evaluators,
     services: [],
 
     /**
@@ -110,6 +111,7 @@ export * from "./types/index.js";
 export { OpenChatClientService } from "./services/openchatClient.js";
 export { actions } from "./actions/index.js";
 export { providers } from "./providers/index.js";
+export { evaluators } from "./evaluators/index.js";
 
 // Default export
 export default openchatPlugin;
