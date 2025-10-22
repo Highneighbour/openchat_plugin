@@ -86,6 +86,78 @@ function getBotDefinition(runtime: IAgentRuntime): BotDefinition {
                 direct_messages: true,
                 params: [],
             },
+            {
+                name: "moderate",
+                default_role: "Moderator",
+                description: "Enable or configure moderation for this chat",
+                permissions: Permissions.encodePermissions({
+                    ...emptyPermissions,
+                    message: ["Text"],
+                    chat: ["ReadMessages", "DeleteMessages"],
+                }),
+                direct_messages: false,
+                params: [
+                    {
+                        name: "action",
+                        required: true,
+                        description: "Moderation action (enable, disable, status)",
+                        placeholder: "enable",
+                        param_type: {
+                            StringParam: {
+                                min_length: 1,
+                                max_length: 20,
+                                choices: [
+                                    { name: "enable", value: "enable" },
+                                    { name: "disable", value: "disable" },
+                                    { name: "status", value: "status" }
+                                ],
+                                multi_line: false,
+                            },
+                        },
+                    },
+                ],
+            },
+            {
+                name: "poll",
+                default_role: "Participant",
+                description: "Create a poll in the chat",
+                permissions: Permissions.encodePermissions({
+                    ...emptyPermissions,
+                    message: ["Text", "Poll"],
+                    chat: ["ReadChatSummary"],
+                }),
+                direct_messages: false,
+                params: [
+                    {
+                        name: "question",
+                        required: true,
+                        description: "Poll question",
+                        placeholder: "What should we do next?",
+                        param_type: {
+                            StringParam: {
+                                min_length: 1,
+                                max_length: 200,
+                                choices: [],
+                                multi_line: false,
+                            },
+                        },
+                    },
+                    {
+                        name: "options",
+                        required: true,
+                        description: "Poll options (comma-separated)",
+                        placeholder: "Option 1, Option 2, Option 3",
+                        param_type: {
+                            StringParam: {
+                                min_length: 1,
+                                max_length: 500,
+                                choices: [],
+                                multi_line: false,
+                            },
+                        },
+                    },
+                ],
+            },
         ],
     };
 }

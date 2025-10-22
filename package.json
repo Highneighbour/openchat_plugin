@@ -37,7 +37,8 @@
     "@open-ic/openchat-botclient-ts": "^1.0.61",
     "express": "^5.1.0",
     "cors": "^2.8.5",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "@msgpack/msgpack": "^3.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -78,6 +79,42 @@
         "description": "Port for OpenChat bot server (default: 3000)",
         "required": false,
         "default": "3000"
+      },
+      "OPENCHAT_WELCOME_NEW_MEMBERS": {
+        "type": "string",
+        "description": "Welcome new members when they join (default: false)",
+        "required": false,
+        "default": "false"
+      },
+      "OPENCHAT_SAY_GOODBYE": {
+        "type": "string",
+        "description": "Say goodbye when members leave (default: false)",
+        "required": false,
+        "default": "false"
+      },
+      "OPENCHAT_AUTO_RESPOND_ALL": {
+        "type": "string",
+        "description": "Respond to all messages, not just mentions (default: false)",
+        "required": false,
+        "default": "false"
+      },
+      "OPENCHAT_MODERATION_ENABLED": {
+        "type": "string",
+        "description": "Enable automatic content moderation (default: false)",
+        "required": false,
+        "default": "false"
+      },
+      "OPENCHAT_MODERATION_ACTION": {
+        "type": "string",
+        "description": "Action to take on flagged content: warn, delete (default: warn)",
+        "required": false,
+        "default": "warn"
+      },
+      "OPENCHAT_MODERATION_KEYWORDS": {
+        "type": "string",
+        "description": "Comma-separated list of keywords to flag (default: empty)",
+        "required": false,
+        "default": ""
       }
     }
   }
