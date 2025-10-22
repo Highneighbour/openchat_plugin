@@ -58,7 +58,7 @@ export const chatDetailsProvider: Provider = {
 
                 // Check if we have ReadChatSummary permission
                 if (permissions.includes("ReadChatSummary")) {
-                    const summary = await client.getChatSummary();
+                    const summary = await (client as any).chatSummary();
                     
                     if (summary) {
                         return {

@@ -135,8 +135,10 @@ export const sendMediaMessageAction: Action = {
                     
                     switch (mediaType.toLowerCase()) {
                         case "image":
-                            // Image messages: url, width, height, caption
-                            msg = (await client.createImageMessage(url, 0, 0, caption)).setFinalised(true);
+                            // Image messages take a blob reference
+                            // For now, create a text message with image info as we need to upload to storage first
+                            const imageMsg = `🖼️ Image: ${url}\n${caption}`;
+                            msg = (await client.createTextMessage(imageMsg)).setFinalised(true);
                             break;
                         case "video":
                         case "audio":

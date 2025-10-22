@@ -125,7 +125,7 @@ export const createPollAction: Action = {
             } catch (error: any) {
                 runtime.logger?.error("[OpenChat] Poll creation not fully supported yet:", error.message);
                 // Fallback to text message
-                const pollText = `📊 ${question}\n\n${pollOptions.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
+                const pollText = `📊 ${question}\n\n${pollOptions.map((opt: string, i: number) => `${i + 1}. ${opt}`).join('\n')}`;
                 const textMsg = (await client.createTextMessage(pollText)).setFinalised(true);
                 await client.sendMessage(textMsg);
             }

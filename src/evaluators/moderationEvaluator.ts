@@ -131,14 +131,24 @@ export const moderationEvaluator: Evaluator = {
 
     examples: [
         {
-            context: "Message contains spam links",
-            expected: { flagged: true, violations: ["spam"] },
+            messages: [
+                {
+                    user: "{{user1}}",
+                    content: { text: "Click here for free money! http://bit.ly/spam" },
+                },
+            ],
+            outcome: "Message flagged for spam",
         },
         {
-            context: "Message is appropriate",
-            expected: { flagged: false, violations: [] },
+            messages: [
+                {
+                    user: "{{user1}}",
+                    content: { text: "Hello everyone! Nice to meet you all." },
+                },
+            ],
+            outcome: "Message is appropriate",
         },
-    ],
+    ] as any,
 };
 
 /**
@@ -167,7 +177,7 @@ async function checkInappropriateContent(runtime: IAgentRuntime, text: string): 
     const inappropriateKeywords = runtime.getSetting("OPENCHAT_MODERATION_KEYWORDS")?.split(",") || [];
     
     const lowerText = text.toLowerCase();
-    return inappropriateKeywords.some(keyword => lowerText.includes(keyword.trim().toLowerCase()));
+    return inappropriateKeywords.some((keyword: string) => lowerText.includes(keyword.trim().toLowerCase()));
 }
 
 /**

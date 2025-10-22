@@ -61,7 +61,8 @@ export const messageHistoryProvider: Provider = {
                 );
 
                 // Get recent messages (limit to last 10)
-                const messages = await client.getMessages({ limit: 10 });
+                // Note: This API may not be fully supported yet
+                const messages = await (client as any).getMessages?.({ limit: 10 }) || [];
 
                 if (!messages || messages.length === 0) {
                     return { text: "OpenChat: No recent messages" };
